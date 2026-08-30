@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>현장 작업 여건 대시보드 (FastAPI 버전)</title>
+
+<!--
+  이 파일은 화면(디자인·그래프)만 담당합니다. 데이터는 들어있지 않습니다.
+  화면이 열리면 아래 <script>가 fetch()로 backend.py 의 /api/weather 를
+  호출해서 데이터를 받아옵니다. (1_python_html처럼 파일을 새로 만드는 게
+  아니라, 그때그때 서버에 "데이터 주세요" 하고 요청하는 방식 = API 통신)
+-->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; background: #f5f6f8; margin: 0; padding: 24px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #666; margin-bottom: 20px; font-size: 13px; }
+  .cards { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); min-width: 150px; }
+  .card .label { font-size: 12px; color: #888; }
+  .card .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .chart-box { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .note { margin-top: 24px; font-size: 13px; color: #666; background: #fff; padding: 14px 18px; border-radius: 10px; }
+  #status { color: #999; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1 id="title">현장 작업 여건 대시보드 (FastAPI 버전)</h1>
+<div class="sub">백엔드(FastAPI, /api/weather) ↔ 프론트엔드(이 화면) — API 통신으로 데이터를 주고받습니다.</div>
+<div id="status">데이터를 불러오는 중...</div>
+
+<div class="cards" id="cards" style="display:none;">
+  <div class="card"><div class="label">평균 기온</div><div class="value" id="c-temp">-</div></div>
+  <div class="card"><div class="label">누적 강수량</div><div class="value" id="c-precip">-</div></div>
+  <div class="card"><div class="label">최대 풍속</div><div class="value" id="c-wind">-</div></div>
+  <div class="card"><div class="label">작업가능 비율</div><div class="value" id="c-rate">-</div></div>
+</div>
+
+<div class="charts">
+  <div class="chart-box"><canvas id="tempChart" height="220"></canvas></div>
+  <div class="chart-box"><canvas id="statusChart" height="220"></canvas></div>
+</div>
+
+<div class="note">
+  장점: 백엔드·프론트엔드 분리로 관리가 쉽고 UI 커스터마이징이 자유로움 · 데이터
+  수집~분석~시각화가 유기적으로 연결됨.<br>
+  단점: 1_python_html보다 구현이 복잡하고, 이 화면을 보려면 backend.py 서버
+  (<code>uvicorn backend:app</code>)가 항상 떠 있어야 함.
+</div>
+
+<script>
+async function main() {
+  const res = await fetch("/api/weather");
+  const data = await res.json();
+
+  document.getElementById("status").style.display = "none";
+  document.getElementById("cards").style.display = "flex";
+  document.getElementById("title").textContent = data.region + " 현장 작업 여건 대시보드 (FastAPI 버전)";
+
+  document.getElementById("c-temp").textContent = data.summary.temp_mean + " °C";
+  document.getElementById("c-precip").textContent = data.summary.precip_total + " mm";
+  document.getElementById("c-wind").textContent = data.summary.wind_max + " km/h";
+  document.getElementById("c-rate").textContent = data.summary.workable_rate + " %";
+
+  const labels = data.hourly.map(h => h.time.slice(5, 16).replace("T", " "));
+
+  new Chart(document.getElementById("tempChart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "기온(°C)", data: data.hourly.map(h => h.temp), borderColor: "#e53935", tension: 0.2 },
+        { label: "체감온도(°C)", data: data.hourly.map(h => h.feels_like), borderColor: "#fb8c00", tension: 0.2, borderDash: [4, 3] },
+      ],
+    },
+    options: { plugins: { title: { display: true, text: "기온 흐름 (실측+예보)" } } },
+  });
+
+  const counts = data.summary.status_counts;
+  new Chart(document.getElementById("statusChart"), {
+    type: "bar",
+    data: {
+      labels: ["작업가능", "주의", "중단"],
+      datasets: [{
+        label: "시간",
+        data: [counts["작업가능"], counts["주의"], counts["중단"]],
+        backgroundColor: ["#2e7d32", "#ef6c00", "#c62828"],
+      }],
+    },
+    options: { plugins: { title: { display: true, text: "상태별 시간 분포" } } },
+  });
+}
+
+main().catch(err => {
+  document.getElementById("status").textContent = "데이터를 불러오지 못했습니다: " + err;
+});
+</script>
+
+</body>
+</html>
