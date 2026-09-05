@@ -8,10 +8,19 @@ Streamlit 챗봇.
 """
 
 import base64
+import re
 
 import fitz  # PyMuPDF
 import requests
 import streamlit as st
+
+CODE_FENCE_PATTERN = re.compile(r"^```(?:markdown|md)?\s*\n(.*)\n```\s*$", re.DOTALL)
+
+
+def strip_code_fence(text: str) -> str:
+    """모델이 응답을 ```markdown ... ``` 코드블록으로 감싸는 경우 벗겨낸다."""
+    match = CODE_FENCE_PATTERN.match(text.strip())
+    return match.group(1) if match else text
 
 OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_OCR_MODEL = "qwen3-vl:4b-instruct"
@@ -54,21 +63,22 @@ def ocr_page_with_ollama(image_bytes: bytes, model: str) -> str:
     }
     res = requests.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, timeout=300)
     res.raise_for_status()
-    return res.json()["response"]
+    return strip_code_fence(res.json()["response"])
 
 
-def extract_pdf_text(pdf_bytes: bytes, ocr_model: str, progress_callback=None) -> list[str]:
-    """모든 페이지를 이미지로 렌더링해 Ollama 비전 모델로 OCR, 마크다운으로 반환."""
+def get_pdf_page_count(pdf_bytes: bytes) -> int:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    page_texts = []
-    for i in range(len(doc)):
-        image_bytes = render_page_to_png_bytes(doc, i)
-        ocr_text = ocr_page_with_ollama(image_bytes, ocr_model)
-        page_texts.append(ocr_text)
-        if progress_callback:
-            progress_callback(i + 1, len(doc))
+    count = len(doc)
     doc.close()
-    return page_texts
+    return count
+
+
+def extract_single_page(pdf_bytes: bytes, page_number: int, ocr_model: str) -> str:
+    """지정한 페이지(1부터 시작) 하나만 이미지로 렌더링해 Ollama 비전 모델로 OCR."""
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    image_bytes = render_page_to_png_bytes(doc, page_number - 1)
+    doc.close()
+    return ocr_page_with_ollama(image_bytes, ocr_model)
 
 
 def chat_with_ollama(messages: list[dict], model: str) -> str:
@@ -89,7 +99,7 @@ st.title("📄 PDF OCR 챗봇")
 st.caption("PDF를 업로드하면 텍스트를 추출하고, 문서 내용에 대해 대화할 수 있습니다.")
 
 if "page_texts" not in st.session_state:
-    st.session_state.page_texts = []
+    st.session_state.page_texts = {}  # {페이지번호: 텍스트}
 if "file_name" not in st.session_state:
     st.session_state.file_name = None
 if "messages" not in st.session_state:
@@ -125,20 +135,24 @@ with st.sidebar:
     if uploaded_file is not None:
         is_new_file = uploaded_file.name != st.session_state.file_name
         if is_new_file:
-            st.session_state.page_texts = []
+            st.session_state.page_texts = {}
             st.session_state.messages = []
             st.session_state.file_name = uploaded_file.name
 
-        if st.button("텍스트 추출 실행", type="primary"):
-            pdf_bytes = uploaded_file.getvalue()
-            progress_bar = st.progress(0.0, text="추출 준비 중...")
+        pdf_bytes = uploaded_file.getvalue()
+        page_count = get_pdf_page_count(pdf_bytes)
+        page_number = st.number_input(
+            "OCR 수행할 페이지 번호", min_value=1, max_value=page_count, value=1, step=1
+        )
+        st.caption(f"전체 {page_count}페이지")
 
-            def on_progress(done, total):
-                progress_bar.progress(done / total, text=f"{done}/{total} 페이지 처리 중...")
-
-            st.session_state.page_texts = extract_pdf_text(pdf_bytes, ocr_model, on_progress)
-            progress_bar.empty()
-            st.success(f"{len(st.session_state.page_texts)}페이지 추출 완료")
+        if st.button("해당 페이지 OCR 실행", type="primary"):
+            page_number = int(page_number)
+            with st.spinner(f"{page_number}페이지 OCR 처리 중..."):
+                st.session_state.page_texts[page_number] = extract_single_page(
+                    pdf_bytes, page_number, ocr_model
+                )
+            st.success(f"{page_number}페이지 추출 완료")
 
 # ---------- 본문: 추출 결과 + 채팅 ----------
 
@@ -147,17 +161,18 @@ col_doc, col_chat = st.columns([1, 1])
 with col_doc:
     st.subheader("추출된 문서")
     if not st.session_state.page_texts:
-        st.info("왼쪽에서 PDF를 업로드하고 '텍스트 추출 실행'을 눌러주세요.")
+        st.info("왼쪽에서 PDF를 업로드하고 페이지 번호를 지정한 뒤 'OCR 실행'을 눌러주세요.")
     else:
-        for idx, text in enumerate(st.session_state.page_texts, start=1):
-            with st.expander(f"{idx} 페이지", expanded=(idx == 1)):
+        sorted_pages = sorted(st.session_state.page_texts.items())
+        for page_num, text in sorted_pages:
+            with st.expander(f"{page_num} 페이지", expanded=True):
                 st.markdown(text)
 
         full_text = "\n\n".join(
-            f"## {i}페이지\n{t}" for i, t in enumerate(st.session_state.page_texts, start=1)
+            f"## {page_num}페이지\n{text}" for page_num, text in sorted_pages
         )
         st.download_button(
-            "전체 텍스트 다운로드 (result.txt)",
+            "추출된 텍스트 다운로드 (result.txt)",
             data=full_text,
             file_name="result.txt",
             mime="text/plain",
@@ -181,7 +196,8 @@ with col_chat:
             st.markdown(user_input)
 
         document_context = "\n\n".join(
-            f"[{i}페이지]\n{t}" for i, t in enumerate(st.session_state.page_texts, start=1)
+            f"[{page_num}페이지]\n{text}"
+            for page_num, text in sorted(st.session_state.page_texts.items())
         )
         system_message = {
             "role": "system",
