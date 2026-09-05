@@ -1,6 +1,7 @@
 .env
 *.ps1
 *.bat
-Day2/2. OCR 실습
+Day2/3. RAG 실습
 __pycache__/
 *.pyc
+.claude
