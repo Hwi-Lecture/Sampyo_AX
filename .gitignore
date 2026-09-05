@@ -1,7 +1,7 @@
 .env
 *.ps1
 *.bat
-Day2/3. RAG 실습
 __pycache__/
 *.pyc
 .claude
+ToDo.md
