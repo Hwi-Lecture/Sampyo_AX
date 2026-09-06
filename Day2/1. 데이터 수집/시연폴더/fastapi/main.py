@@ -28,7 +28,7 @@ from load_data import (
 )
 
 BASE_DIR = Path(__file__).parent
-DASHBOARD_HTML = BASE_DIR / "dashboard.html"
+DASHBOARD_HTML = BASE_DIR / "index.html"
 
 CACHE_TTL_SECONDS = 10 * 60  # 10분
 _cache = {"data": None, "fetched_at": 0.0}

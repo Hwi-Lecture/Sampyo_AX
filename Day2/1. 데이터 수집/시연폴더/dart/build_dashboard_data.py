@@ -236,7 +236,7 @@ with open(json_path, "w", encoding="utf-8") as f:
 # cement_dashboard.html을 생성한다. 화면에 찍히는 모든 수치는
 # 이 JSON에서만 나오므로 템플릿에 수기로 옮겨 적을 일이 없다.
 template_path = os.path.join(BASE_DIR, "dashboard_template.html")
-html_path = os.path.join(BASE_DIR, "cement_dashboard.html")
+html_path = os.path.join(BASE_DIR, "index.html")
 with open(template_path, encoding="utf-8") as f:
     template = f.read()
 injected = template.replace(
