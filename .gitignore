@@ -1,6 +1,4 @@
 .env
-*.ps1
-*.bat
 __pycache__/
 *.pyc
 .claude

@@ -1,0 +1,33 @@
+# 삼표 업무자동화 실습자료 - 파이썬 패키지 목록
+# 설치: pip install -r requirements.txt
+
+# 데이터 처리 / 엑셀
+pandas
+openpyxl
+numpy
+
+# 시각화
+matplotlib
+
+# 문서 (Word)
+python-docx
+
+# PDF / 이미지 / OCR
+pymupdf
+pillow
+opencv-python
+
+# 웹 요청 / 환경변수
+requests
+python-dotenv
+
+# 웹 앱
+streamlit
+fastapi
+uvicorn[standard]
+
+# RAG (검색)
+rank-bm25
+
+# 로컬 LLM
+ollama
