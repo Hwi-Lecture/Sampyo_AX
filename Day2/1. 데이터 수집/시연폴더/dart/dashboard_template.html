@@ -1,0 +1,704 @@
+<title>시멘트 4사 재무 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --bg: #f2f0ea;
+    --surface: #ffffff;
+    --surface-2: #eae6dc;
+    --ink: #1d1c19;
+    --ink-2: #55524a;
+    --muted: #8a8579;
+    --border: #ddd8cc;
+    --border-strong: #c9c3b4;
+    --brand: #37507a;
+    --brand-ink: #ffffff;
+    --good: #0ca30c;
+    --bad: #d03b3b;
+    --grid-line: #e1ddd2;
+
+    --c1: #2a78d6; /* 쌍용씨앤이 */
+    --c2: #eb6834; /* 한일시멘트 */
+    --c3: #1baf7a; /* 아세아시멘트 */
+    --c4: #eda100; /* 성신양회 */
+
+    --font-display: "IBM Plex Sans KR", "IBM Plex Sans", system-ui, sans-serif;
+    --font-body: "IBM Plex Sans KR", "IBM Plex Sans", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg: #131210;
+      --surface: #1c1b18;
+      --surface-2: #242320;
+      --ink: #f2f0ea;
+      --ink-2: #c7c2b5;
+      --muted: #918c7e;
+      --border: #34322c;
+      --border-strong: #45423a;
+      --brand: #7fa0cc;
+      --brand-ink: #14140f;
+      --good: #0ca30c;
+      --bad: #e66767;
+      --grid-line: #2c2b26;
+
+      --c1: #3987e5;
+      --c2: #d95926;
+      --c3: #199e70;
+      --c4: #c98500;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg: #131210;
+    --surface: #1c1b18;
+    --surface-2: #242320;
+    --ink: #f2f0ea;
+    --ink-2: #c7c2b5;
+    --muted: #918c7e;
+    --border: #34322c;
+    --border-strong: #45423a;
+    --brand: #7fa0cc;
+    --brand-ink: #14140f;
+    --good: #0ca30c;
+    --bad: #e66767;
+    --grid-line: #2c2b26;
+
+    --c1: #3987e5;
+    --c2: #d95926;
+    --c3: #199e70;
+    --c4: #c98500;
+  }
+
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+  }
+  .wrap{
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 40px 28px 64px;
+  }
+
+  /* ---------- Header ---------- */
+  header.page{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border-strong);
+    margin-bottom: 28px;
+  }
+  .kicker{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--brand);
+    margin: 0 0 8px;
+  }
+  h1{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(24px, 3vw, 32px);
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .subtitle{
+    color: var(--ink-2);
+    font-size: 14.5px;
+    margin: 0;
+    max-width: 62ch;
+  }
+  .source-tag{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+
+  /* ---------- Section headings ---------- */
+  .section-head{
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 44px 0 16px;
+  }
+  .section-head .n{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .section-head h2{
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .section-head .rule{
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ---------- Industry summary tiles ---------- */
+  .summary-row{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .summary-tile{
+    background: var(--brand);
+    color: var(--brand-ink);
+    border-radius: 10px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .summary-tile .label{
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+    opacity: 0.85;
+  }
+  .summary-tile .value{
+    font-family: var(--font-mono);
+    font-size: 30px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .summary-tile .value .unit{
+    font-size: 16px;
+    font-weight: 500;
+  }
+  .summary-tile .delta{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    opacity: 0.92;
+  }
+
+  /* ---------- KPI company cards ---------- */
+  .kpi-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    gap: 14px;
+  }
+  .kpi-card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .kpi-card .head{
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi-card .swatch{
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex: none;
+  }
+  .kpi-card .name{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .kpi-card .rows{
+    display: flex;
+    flex-direction: column;
+  }
+  .kpi-row{
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi-row:last-child{ border-bottom: none; }
+  .kpi-row .metric{
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+  .kpi-row .metric .flag{
+    color: var(--brand);
+    cursor: help;
+  }
+  .kpi-row .val{
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .kpi-row .val .unit{
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+  .chip{
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip.up{ color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+  .chip.down{ color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+  .chip.flat{ color: var(--muted); background: var(--surface-2); }
+  .kpi-card .foot{
+    padding: 9px 18px 13px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .kpi-card .note{
+    padding: 0 18px 12px;
+    font-size: 10.5px;
+    color: var(--brand);
+    line-height: 1.5;
+  }
+
+  /* ---------- Chart cards ---------- */
+  .chart-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 16px;
+  }
+  .chart-card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px 12px;
+  }
+  .chart-card .ctitle{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 14.5px;
+    margin: 0 0 1px;
+  }
+  .chart-card .cunit{
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .chart-card .canvas-wrap{
+    position: relative;
+    height: 260px;
+  }
+
+  /* ---------- Filings (주요사항보고서) ---------- */
+  .filing-card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .filing-scroll{
+    max-height: 460px;
+    overflow-y: auto;
+  }
+  .filing-row{
+    display: grid;
+    grid-template-columns: 96px 92px 1fr 84px;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .filing-row:last-child{ border-bottom: none; }
+  .filing-row:hover{ background: var(--surface-2); }
+  .filing-row.empty{ color: var(--muted); font-size: 13px; }
+  .filing-co{
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .filing-co .swatch{
+    width: 8px; height: 8px; border-radius: 2px; flex: none;
+  }
+  .filing-date{
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .filing-title{
+    font-size: 13.5px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .filing-title .amend{
+    font-size: 11px;
+    color: var(--brand);
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+  .filing-link{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--brand);
+    text-decoration: none;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .filing-link:hover{ text-decoration: underline; }
+  .filing-card .legend{
+    padding: 10px 20px;
+    font-size: 11.5px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+  }
+
+  @media (max-width: 640px){
+    .filing-row{ grid-template-columns: 1fr auto; row-gap: 4px; }
+    .filing-date{ order: 2; justify-self: end; }
+    .filing-title{ order: 3; grid-column: 1 / -1; white-space: normal; }
+    .filing-link{ order: 4; grid-column: 1 / -1; text-align: left; }
+  }
+
+  footer.page{
+    margin-top: 46px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: 640px){
+    .wrap{ padding: 28px 16px 48px; }
+    .kpi-row{ grid-template-columns: 1fr auto; row-gap: 3px; }
+    .kpi-row .chip{ grid-column: 2; justify-self: end; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div>
+      <p class="kicker">DART 전자공시 · 연결재무제표 기준</p>
+      <h1>시멘트 4사 재무 대시보드</h1>
+      <p class="subtitle">쌍용씨앤이 · 한일시멘트 · 아세아시멘트 · 성신양회의 2026년 상반기 실적과 2020&ndash;2025년 매출·수익성·투자 지표를 한 화면에 정리했습니다.</p>
+    </div>
+    <div class="source-tag" id="source-tag"></div>
+  </header>
+
+  <div class="summary-row" id="summary-row"></div>
+
+  <div class="section-head">
+    <span class="n">01</span>
+    <h2>2026년 상반기 실적 · 전년동기(2025H1) 대비</h2>
+    <span class="rule"></span>
+  </div>
+  <div class="kpi-grid" id="kpi-grid"></div>
+
+  <div class="section-head">
+    <span class="n">02</span>
+    <h2>연간 매출액 · 영업이익률 추이 (2020&ndash;2025, 사업보고서)</h2>
+    <span class="rule"></span>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <p class="ctitle">연간 매출액</p>
+      <p class="cunit">단위: 억원</p>
+      <div class="canvas-wrap"><canvas id="chart-revenue"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <p class="ctitle">연간 영업이익률</p>
+      <p class="cunit">단위: %</p>
+      <div class="canvas-wrap"><canvas id="chart-margin"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <span class="n">03</span>
+    <h2>유형자산 취득액 · 부채비율 추이 (2020&ndash;2025)</h2>
+    <span class="rule"></span>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <p class="ctitle">유형자산 취득액</p>
+      <p class="cunit">단위: 억원 (현금흐름표 투자활동)</p>
+      <div class="canvas-wrap"><canvas id="chart-capex"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <p class="ctitle">부채비율</p>
+      <p class="cunit">단위: % (부채총계 ÷ 자본총계 × 100)</p>
+      <div class="canvas-wrap"><canvas id="chart-debt"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <span class="n">04</span>
+    <h2>주요사항보고서 (2020&ndash;2026)</h2>
+    <span class="rule"></span>
+  </div>
+  <div class="filing-card">
+    <div class="filing-scroll" id="filing-list"></div>
+    <div class="legend">최신순 정렬 · 원문보기는 DART 전자공시시스템(dart.fss.or.kr) 새 창으로 열립니다</div>
+  </div>
+
+  <footer class="page" id="page-footer"></footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<script>
+// build_dashboard_data.py가 DART Open API에서 직접 조회해 생성한 데이터.
+// 이 블록은 스크립트가 dashboard_data.json 내용을 그대로 주입한 것이며,
+// 화면에 찍히는 수치는 전부 이 객체에서만 읽어온다 (수기 입력 없음).
+var DASHBOARD_DATA = /*__DASHBOARD_DATA__*/{};
+
+(function(){
+  var DATA = DASHBOARD_DATA;
+  var COLOR_VAR = { ssangyong: '--c1', hanil: '--c2', asia: '--c3', sungshin: '--c4' };
+  var COMPANIES = DATA.companies.map(function(c){ return { key: c.key, name: c.name, color: 'var(' + COLOR_VAR[c.key] + ')' }; });
+  var YEARS = DATA.years;
+  var NOTES = DATA.notes || [];
+
+  function noteFor(companyKey, metric){
+    return NOTES.find(function(n){ return n.company === companyKey && n.metric === metric; });
+  }
+
+  function fmt(n, d){ d = d===undefined?1:d; return n.toLocaleString('ko-KR', {minimumFractionDigits:d, maximumFractionDigits:d}); }
+  function pp(a,b){ return Math.round((a-b)*10)/10; }
+  function pct(a,b){ return Math.round(((a-b)/Math.abs(b))*1000)/10; }
+
+  function deltaChip(curr, prev, opts){
+    opts = opts || {};
+    var d = opts.isPP ? pp(curr, prev) : pct(curr, prev);
+    var cls = d > 0.05 ? 'up' : (d < -0.05 ? 'down' : 'flat');
+    var arrow = cls === 'up' ? '▲' : (cls === 'down' ? '▼' : '─');
+    var suffix = opts.isPP ? 'pp' : '%';
+    var text = arrow + ' ' + fmt(Math.abs(d), 1) + suffix;
+    return '<span class="chip ' + cls + '">' + text + '</span>';
+  }
+
+  function buildSummary(){
+    var sumRev26 = 0, sumRev25 = 0, sumOp26 = 0, sumOp25 = 0;
+    COMPANIES.forEach(function(c){
+      var h = DATA.half_year[c.key];
+      sumRev26 += h.revenue.h1_2026; sumRev25 += h.revenue.h1_2025;
+      sumOp26 += h.op_income.h1_2026; sumOp25 += h.op_income.h1_2025;
+    });
+    sumRev26 = Math.round(sumRev26*10)/10; sumRev25 = Math.round(sumRev25*10)/10;
+    sumOp26 = Math.round(sumOp26*10)/10; sumOp25 = Math.round(sumOp25*10)/10;
+
+    var tiles = [
+      { label: '4사 합계 매출액 · 2026년 상반기', value: sumRev26, prev: sumRev25 },
+      { label: '4사 합계 영업이익 · 2026년 상반기', value: sumOp26, prev: sumOp25 }
+    ];
+    document.getElementById('summary-row').innerHTML = tiles.map(function(t){
+      var d = pct(t.value, t.prev);
+      var arrow = d >= 0 ? '▲' : '▼';
+      return '<div class="summary-tile">' +
+        '<span class="label">' + t.label + '</span>' +
+        '<span class="value">' + fmt(t.value) + '<span class="unit"> 억원</span></span>' +
+        '<span class="delta">전년동기(2025H1) ' + fmt(t.prev) + '억원 대비 ' + arrow + ' ' + fmt(Math.abs(d),1) + '%</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function buildKPI(){
+    var grid = document.getElementById('kpi-grid');
+    grid.innerHTML = COMPANIES.map(function(c){
+      var h = DATA.half_year[c.key];
+      var rows = [
+        { label: '매출액', metric: 'revenue', cur: h.revenue.h1_2026, prev: h.revenue.h1_2025, unit: '억원' },
+        { label: '영업이익', metric: 'op_income', cur: h.op_income.h1_2026, prev: h.op_income.h1_2025, unit: '억원' },
+        { label: '당기순이익', metric: 'net_income', cur: h.net_income.h1_2026, prev: h.net_income.h1_2025, unit: '억원' },
+        { label: '영업이익률', metric: 'op_margin', cur: h.op_margin.h1_2026, prev: h.op_margin.h1_2025, isPP:true, unit:'%' }
+      ];
+      var noteLines = [];
+      var rowsHtml = rows.map(function(r){
+        var note = noteFor(c.key, r.metric);
+        var flag = note ? ' <span class="flag" title="전년동기 원공시: ' + fmt(note.originally_filed) + '억원">†</span>' : '';
+        if (note) noteLines.push('† ' + r.label + ' 전년동기치는 소급재작성값(원공시 ' + fmt(note.originally_filed) + '억원). ' + note.reason);
+        var valueText = fmt(r.cur, 1) + '<span class="unit">' + r.unit + '</span>';
+        return '<div class="kpi-row">' +
+          '<span class="metric">' + r.label + flag + '</span>' +
+          '<span class="val">' + valueText + '</span>' +
+          deltaChip(r.cur, r.prev, {isPP: !!r.isPP}) +
+          '</div>';
+      }).join('');
+      var noteHtml = noteLines.length ? '<div class="note">' + noteLines.join('<br>') + '</div>' : '';
+      return '<div class="kpi-card">' +
+        '<div class="head"><span class="swatch" style="background:' + c.color + '"></span><span class="name">' + c.name + '</span></div>' +
+        '<div class="rows">' + rowsHtml + '</div>' +
+        noteHtml +
+        '<div class="foot">2026년 상반기 · 전년동기(2025H1) 대비</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function buildFilings(){
+    var byKey = {};
+    COMPANIES.forEach(function(c){ byKey[c.key] = c; });
+    var container = document.getElementById('filing-list');
+    var seenCompanies = {};
+    var rows = DATA.filings.map(function(f){
+      var c = byKey[f.co];
+      seenCompanies[f.co] = true;
+      var amendTag = f.amend ? '<span class="amend">정정</span>' : '';
+      return '<div class="filing-row">' +
+        '<span class="filing-date">' + f.date + '</span>' +
+        '<span class="filing-co"><span class="swatch" style="background:' + c.color + '"></span>' + c.name + '</span>' +
+        '<span class="filing-title" title="' + f.title + '">' + amendTag + f.title + '</span>' +
+        '<a class="filing-link" href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=' + f.rcept_no + '" target="_blank" rel="noopener">원문보기 ↗</a>' +
+        '</div>';
+    });
+    COMPANIES.forEach(function(c){
+      if (!seenCompanies[c.key]){
+        rows.push('<div class="filing-row empty"><span></span><span class="filing-co"><span class="swatch" style="background:' + c.color + '"></span>' + c.name + '</span><span class="filing-title">조회 기간(2020&ndash;2026) 내 주요사항보고서 없음</span><span></span></div>');
+      }
+    });
+    container.innerHTML = rows.join('');
+  }
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  var charts = [];
+  function destroyCharts(){ charts.forEach(function(c){ c.destroy(); }); charts = []; }
+
+  function baseOptions(theme){
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: theme.ink2, usePointStyle: true, pointStyle: 'circle',
+            boxWidth: 8, boxHeight: 8, padding: 14,
+            font: { family: "'IBM Plex Sans KR','IBM Plex Sans',sans-serif", size: 11 }
+          }
+        },
+        tooltip: {
+          backgroundColor: theme.surface, titleColor: theme.ink, bodyColor: theme.ink2,
+          borderColor: theme.border, borderWidth: 1, padding: 10, cornerRadius: 8,
+          titleFont: { family: "'IBM Plex Mono',monospace", size: 11, weight: '600' },
+          bodyFont: { family: "'IBM Plex Mono',monospace", size: 11.5 },
+          boxPadding: 4
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: theme.muted, font: { family: "'IBM Plex Mono',monospace", size: 11 } },
+          border: { color: theme.gridLine }
+        },
+        y: {
+          grid: { color: theme.gridLine },
+          ticks: { color: theme.muted, font: { family: "'IBM Plex Mono',monospace", size: 11 } },
+          border: { display: false }
+        }
+      }
+    };
+  }
+
+  function buildCharts(){
+    destroyCharts();
+    var theme = {
+      ink: cssVar('--ink'), ink2: cssVar('--ink-2'), muted: cssVar('--muted'),
+      surface: cssVar('--surface'), border: cssVar('--border'), gridLine: cssVar('--grid-line')
+    };
+    var colors = COMPANIES.map(function(c){ return cssVar(COLOR_VAR[c.key]); });
+
+    function lineDatasets(pick){
+      return COMPANIES.map(function(c, i){
+        return {
+          label: c.name,
+          data: DATA.annual[c.key][pick],
+          borderColor: colors[i],
+          backgroundColor: colors[i],
+          pointBackgroundColor: colors[i],
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          borderWidth: 2,
+          tension: 0.25,
+          fill: false
+        };
+      });
+    }
+
+    charts.push(new Chart(document.getElementById('chart-revenue'), {
+      type: 'line',
+      data: { labels: YEARS, datasets: lineDatasets('revenue') },
+      options: baseOptions(theme)
+    }));
+
+    charts.push(new Chart(document.getElementById('chart-margin'), {
+      type: 'line',
+      data: { labels: YEARS, datasets: lineDatasets('op_margin') },
+      options: baseOptions(theme)
+    }));
+
+    charts.push(new Chart(document.getElementById('chart-capex'), {
+      type: 'bar',
+      data: {
+        labels: YEARS,
+        datasets: COMPANIES.map(function(c,i){
+          return { label: c.name, data: DATA.annual[c.key].capex, backgroundColor: colors[i], borderRadius: 3, maxBarThickness: 22 };
+        })
+      },
+      options: baseOptions(theme)
+    }));
+
+    charts.push(new Chart(document.getElementById('chart-debt'), {
+      type: 'line',
+      data: { labels: YEARS, datasets: lineDatasets('debt_ratio') },
+      options: baseOptions(theme)
+    }));
+  }
+
+  document.getElementById('source-tag').innerHTML =
+    '출처: ' + DATA.meta.source + '<br>' +
+    '단위: ' + DATA.meta.unit + '<br>' +
+    '최종 갱신: ' + DATA.meta.generated_at;
+
+  document.getElementById('page-footer').innerHTML =
+    '<span>DART Open API 조회 결과를 바탕으로 build_dashboard_data.py가 생성 (' + DATA.meta.fs_basis + ')</span>' +
+    '<span>반기보고서(11012) · 사업보고서(11011) · 주요사항보고(pblntf_ty=B)</span>';
+
+  buildSummary();
+  buildKPI();
+  buildCharts();
+  buildFilings();
+
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  if (mq.addEventListener) mq.addEventListener('change', buildCharts);
+})();
+</script>
