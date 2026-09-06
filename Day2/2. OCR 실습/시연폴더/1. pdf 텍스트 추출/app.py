@@ -1,16 +1,19 @@
 """
 PDF를 업로드하면 모든 페이지를 이미지로 변환해 Ollama의 비전 모델로 OCR을 수행하고
 (마크다운 문법으로 구조를 유지), 추출된 내용을 바탕으로 문서에 대해 대화할 수 있는
-Streamlit 챗봇.
+Streamlit 챗봇. 표 이미지를 업로드하면 표 내용을 엑셀 파일로 추출하는 기능도 포함.
 
 실행: streamlit run app.py
 사전 요구사항: Ollama가 로컬에서 실행 중이어야 함 (http://localhost:11434)
 """
 
 import base64
+import io
+import json
 import re
 
 import fitz  # PyMuPDF
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -34,6 +37,27 @@ OCR_PROMPT = (
     "목록은 -, 1. 같은 목록 문법으로 나타내고, 강조된 텍스트는 **굵게** 표시해줘. "
     "텍스트를 요약하거나 재구성하지 말고, 내용은 그대로 유지한 채 구조만 마크다운으로 옮겨줘."
 )
+
+# 월별 수급 표처럼 구조(행/열)가 고정된 표에서는, 모델이 표 전체를 다시 그리게 하는 대신
+# 행 이름과 열(1~12월)은 하드코딩해두고 숫자값만 OCR로 채운다.
+# 소계/합계는 OCR 대신 코드로 직접 계산해 오인식 리스크를 없앤다.
+DEFAULT_ROW_LABELS = ["생산", "수입", "출하", "국내출하", "수출", "재고"]
+DEFAULT_SKIP_TOTAL_ROWS = ["재고"]
+MONTHS = list(range(1, 13))
+
+
+def build_table_prompt(row_labels: list[str]) -> str:
+    labels_str = ", ".join(f'"{label}"' for label in row_labels)
+    return (
+        "이 이미지는 월별 수급 표입니다. 표에는 1월부터 12월까지의 숫자 값이 있습니다. "
+        f"다음 행에 대해서만 1월부터 12월까지의 숫자를 순서대로 추출해줘: {labels_str}. "
+        "소계나 합계 열은 무시하고 1~12월 값만 추출해. "
+        "쉼표(,)나 천 단위 구분기호는 빼고 정수로만 출력해. "
+        "다른 설명 없이 아래 JSON 형식으로만 출력해:\n"
+        "{\n"
+        + ",\n".join(f'  "{label}": [1월값, 2월값, ..., 12월값]' for label in row_labels)
+        + "\n}"
+    )
 
 
 # ---------- Ollama 연동 ----------
@@ -81,6 +105,68 @@ def extract_single_page(pdf_bytes: bytes, page_number: int, ocr_model: str) -> s
     return ocr_page_with_ollama(image_bytes, ocr_model)
 
 
+def ocr_table_values_with_ollama(image_bytes: bytes, model: str, row_labels: list[str]) -> str:
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    payload = {
+        "model": model,
+        "prompt": build_table_prompt(row_labels),
+        "images": [image_b64],
+        "stream": False,
+    }
+    res = requests.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, timeout=300)
+    res.raise_for_status()
+    return strip_code_fence(res.json()["response"])
+
+
+def parse_json_response(raw_text: str) -> dict:
+    """모델 응답에서 JSON 블록만 뽑아 dict로 변환한다."""
+    match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+    if not match:
+        raise ValueError(f"응답에서 JSON을 찾지 못했습니다:\n{raw_text}")
+    return json.loads(match.group(0))
+
+
+def clean_number(value) -> int:
+    if isinstance(value, (int, float)):
+        return int(value)
+    digits = re.sub(r"[^\d-]", "", str(value))
+    return int(digits) if digits else 0
+
+
+def build_table_dataframe(
+    row_values: dict, row_labels: list[str], skip_total_rows: list[str]
+) -> pd.DataFrame:
+    """행 이름/월 열은 고정하고, 숫자값만 채운 뒤 소계·합계는 직접 계산한다."""
+    records = []
+    for label in row_labels:
+        months = [clean_number(v) for v in row_values.get(label, [None] * 12)]
+        if len(months) != 12:
+            raise ValueError(f"'{label}' 행의 값 개수가 12개가 아닙니다: {months}")
+
+        row = {"구분": label}
+        for month, value in zip(MONTHS, months):
+            row[f"{month}월"] = value
+
+        if label not in skip_total_rows:
+            row["소계(1~6월)"] = sum(months[0:6])
+            row["합계(1~12월)"] = sum(months)
+        else:
+            row["소계(1~6월)"] = None
+            row["합계(1~12월)"] = None
+
+        records.append(row)
+
+    columns = ["구분"] + [f"{m}월" for m in MONTHS] + ["소계(1~6월)", "합계(1~12월)"]
+    return pd.DataFrame(records, columns=columns)
+
+
+def dataframe_to_excel_bytes(df: pd.DataFrame) -> bytes:
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="표")
+    return buffer.getvalue()
+
+
 def chat_with_ollama(messages: list[dict], model: str) -> str:
     payload = {
         "model": model,
@@ -104,6 +190,12 @@ if "file_name" not in st.session_state:
     st.session_state.file_name = None
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "table_df" not in st.session_state:
+    st.session_state.table_df = None
+if "table_raw_response" not in st.session_state:
+    st.session_state.table_raw_response = None
+if "table_file_name" not in st.session_state:
+    st.session_state.table_file_name = None
 
 installed_models = get_installed_models()
 
@@ -216,3 +308,68 @@ with col_chat:
                 st.markdown(reply)
 
         st.session_state.messages.append({"role": "assistant", "content": reply})
+
+# ---------- 표 이미지 → 엑셀 추출 (행/열 구조 고정, 숫자만 OCR) ----------
+
+st.divider()
+st.subheader("🖼️ 표 이미지 → 엑셀 추출")
+st.caption(
+    "월별 수급 표처럼 행/열 구조가 고정된 표를 대상으로 합니다. "
+    "행 이름과 1~12월 열은 고정해두고 모델은 숫자값만 추출하며, 소계·합계는 직접 계산합니다."
+)
+
+row_labels_input = st.text_input(
+    "표의 행 이름 (쉼표로 구분, 표에 표시된 순서대로)",
+    value=", ".join(DEFAULT_ROW_LABELS),
+    key="table_row_labels_input",
+)
+row_labels = [label.strip() for label in row_labels_input.split(",") if label.strip()]
+
+skip_total_rows = st.multiselect(
+    "소계·합계를 계산하지 않을 행 (재고처럼 누적값인 경우)",
+    options=row_labels,
+    default=[label for label in DEFAULT_SKIP_TOTAL_ROWS if label in row_labels],
+    key="table_skip_total_rows",
+)
+
+image_file = st.file_uploader(
+    "표 이미지 업로드", type=["png", "jpg", "jpeg"], key="table_image_uploader"
+)
+
+if image_file is not None:
+    st.image(image_file, caption=image_file.name, width=400)
+
+    if st.button("표 추출 실행", type="primary", key="extract_table_button", disabled=not row_labels):
+        with st.spinner("표 숫자 인식 중..."):
+            raw_response = ocr_table_values_with_ollama(image_file.getvalue(), ocr_model, row_labels)
+            st.session_state.table_raw_response = raw_response
+            try:
+                row_values = parse_json_response(raw_response)
+                df = build_table_dataframe(row_values, row_labels, skip_total_rows)
+            except (ValueError, json.JSONDecodeError) as e:
+                st.session_state.table_df = None
+                st.error(f"표 추출에 실패했습니다: {e}")
+            else:
+                st.session_state.table_df = df
+                st.session_state.table_file_name = image_file.name
+                st.success("표를 추출했습니다.")
+
+if st.session_state.table_raw_response:
+    with st.expander("모델 원본 응답 보기 (디버깅용)"):
+        st.code(st.session_state.table_raw_response)
+
+if st.session_state.table_df is not None:
+    st.dataframe(st.session_state.table_df, use_container_width=True)
+
+    excel_bytes = dataframe_to_excel_bytes(st.session_state.table_df)
+    base_name = (
+        st.session_state.table_file_name.rsplit(".", 1)[0]
+        if st.session_state.table_file_name
+        else "table"
+    )
+    st.download_button(
+        "엑셀 파일 다운로드 (.xlsx)",
+        data=excel_bytes,
+        file_name=f"{base_name}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
